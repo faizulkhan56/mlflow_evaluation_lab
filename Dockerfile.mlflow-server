@@ -6,8 +6,9 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends curl postgresql-client && \
     rm -rf /var/lib/apt/lists/*
 
-# Install MLflow and PostgreSQL adapter
-RUN pip install --no-cache-dir mlflow psycopg2-binary
+# Upgrade pip and install MLflow and PostgreSQL adapter with increased timeout and retries
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir --default-timeout=100 --retries 5 mlflow psycopg2-binary
 
 # Set working directory
 WORKDIR /app

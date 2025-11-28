@@ -1,14 +1,13 @@
-# Use Python 3.11 slim image as base
+# Dockerfile for FastAPI Prediction Server
 FROM python:3.11-slim
 
 # Set working directory
 WORKDIR /app
 
 # Install system dependencies
-RUN apt-get update && apt-get install -y \
-    gcc \
-    g++ \
-    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends gcc g++ curl && \
+    rm -rf /var/lib/apt/lists/*
 
 # Copy requirements file
 COPY requirements.txt .
@@ -25,14 +24,17 @@ RUN pip install --upgrade pip && \
     pip install --no-cache-dir --default-timeout=100 --retries 5 \
     fastapi>=0.104.0 uvicorn[standard]>=0.24.0 pydantic>=2.0.0 requests>=2.31.0
 
-# Copy application files
-COPY classification.py .
-COPY regressor.py .
+# Copy API server file
+COPY api_server.py .
 
-# Set environment variables for MLflow
+# Expose API port
+EXPOSE 8000
+
+# Set environment variables
 ENV MLFLOW_TRACKING_URI=http://mlflow-server:5000
 ENV MLFLOW_REGISTRY_URI=http://mlflow-server:5000
+ENV GIT_PYTHON_REFRESH=quiet
 
-# Default command (can be overridden in docker-compose)
-CMD ["python", "classification.py"]
+# Run FastAPI server
+CMD ["uvicorn", "api_server:app", "--host", "0.0.0.0", "--port", "8000"]
 

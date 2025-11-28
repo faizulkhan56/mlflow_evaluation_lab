@@ -1,10 +1,13 @@
+"""
+Lab 1: Logistic Regression (Classification)
+Dataset: sklearn.datasets.load_breast_cancer
+"""
 import os
 import mlflow
 import mlflow.sklearn
-import xgboost as xgb
-import shap
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import confusion_matrix  # ⬅️ NEW
+from sklearn.linear_model import LogisticRegression
+from sklearn.datasets import load_breast_cancer
 from mlflow.models import infer_signature
 from mlflow.models import evaluate as mlflow_evaluate
 
@@ -15,41 +18,53 @@ os.environ.setdefault("GIT_PYTHON_REFRESH", "quiet")
 tracking_uri = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
 mlflow.set_tracking_uri(tracking_uri)
 mlflow.set_registry_uri(tracking_uri)
-experiment_name = "evaluation-classification"
+
+experiment_name = "lab1-logistic-regression"
 mlflow.set_experiment(experiment_name)
 
-# 1. Load data and split
-X, y = shap.datasets.adult()
+# Load breast cancer dataset
+cancer = load_breast_cancer(as_frame=True)
+X = cancer.data
+y = cancer.target
+
+# Split data
 X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.33, random_state=42
+    X, y, test_size=0.2, random_state=42
 )
 
-# 2. Train model
-model = xgb.XGBClassifier()
+# Train Logistic Regression model
+model = LogisticRegression(max_iter=1000, random_state=42)
 model.fit(X_train, y_train)
 
-# 3. Build evaluation dataset (features + label)
+# Prepare evaluation data
 eval_data = X_test.copy()
 eval_data["label"] = y_test
 
-with mlflow.start_run(run_name="xgboost_adult_classifier"):
-    # 4. Infer signature (input/output schema)
+with mlflow.start_run(run_name="logistic_regression_breast_cancer"):
+    # Infer signature using X_test (represents real-world inference scenario)
     y_pred = model.predict(X_test)
     signature = infer_signature(X_test, y_pred)
 
-    # 5. Log model to MLflow
+    # Log model
     mlflow.sklearn.log_model(
         sk_model=model,
-        artifact_path="model",  # Using artifact_path for compatibility
+        artifact_path="model",
         signature=signature,
     )
 
-    # 6. Define prediction function for MLflow evaluation
+    # Log parameters
+    mlflow.log_params({
+        "max_iter": 1000,
+        "random_state": 42,
+        "solver": "lbfgs",
+    })
+
+    # Define prediction function for evaluation
     def predict_fn(df):
         features = df.drop(columns=["label"], errors="ignore")
         return model.predict(features)
 
-    # 7. Run MLflow evaluation
+    # Evaluate model
     result = mlflow_evaluate(
         model=predict_fn,
         data=eval_data,
@@ -58,7 +73,7 @@ with mlflow.start_run(run_name="xgboost_adult_classifier"):
         evaluators=["default"],
     )
 
-    # 8. Print metrics safely (handle missing metrics)
+    # Print metrics safely
     if "accuracy_score" in result.metrics:
         print(f"Accuracy: {result.metrics['accuracy_score']:.3f}")
     else:
@@ -69,23 +84,19 @@ with mlflow.start_run(run_name="xgboost_adult_classifier"):
     else:
         print("F1 Score: N/A")
 
-    # ROC AUC might not always be available (depends on evaluation configuration)
     if "roc_auc_score" in result.metrics:
         print(f"ROC AUC: {result.metrics['roc_auc_score']:.3f}")
     elif "roc_auc" in result.metrics:
         print(f"ROC AUC: {result.metrics['roc_auc']:.3f}")
     else:
-        print("ROC AUC: Not available (check MLflow UI for all metrics)")
+        print("ROC AUC: Not available")
 
-    # 9. Confusion Matrix (using y_test and y_pred)
-    cm = confusion_matrix(y_test, y_pred)
-    print("\nConfusion Matrix (rows=true, cols=predicted):")
-    print(cm)
+    if "precision_score" in result.metrics:
+        print(f"Precision: {result.metrics['precision_score']:.3f}")
 
-    # Optionally print TN, FP, FN, TP explicitly
-    if cm.shape == (2, 2):
-        tn, fp, fn, tp = cm.ravel()
-        print(f"TN: {tn}, FP: {fp}, FN: {fn}, TP: {tp}")
+    if "recall_score" in result.metrics:
+        print(f"Recall: {result.metrics['recall_score']:.3f}")
 
-    # 10. Print all available metrics for reference
+    # Print all available metrics
     print(f"\nAll available metrics: {list(result.metrics.keys())}")
+

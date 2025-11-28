@@ -2,11 +2,12 @@
 
 ## 📘 1. Introduction
 This project demonstrates how to evaluate Machine Learning models using **MLflow**, covering:
-- Classification model evaluation (XGBoost + SHAP)
-- Regression model evaluation (Linear Regression)
-- MLflow tracking server setup
-- Logging models, metrics, and artifacts
-- Understanding backend store, artifact store, and evaluation metrics
+- **7 Machine Learning Models**: Logistic Regression, Decision Tree Regressor, K-Means Clustering, Random Forest Classifier, Isolation Forest, XGBoost Classifier, and Linear Regressor
+- **MLflow Tracking**: Complete experiment tracking with PostgreSQL backend
+- **FastAPI Prediction API**: RESTful endpoints for real-time model predictions
+- **Docker Deployment**: Fully containerized setup with Docker Compose
+- **Model Evaluation**: Automated metrics calculation and artifact generation
+- **Production-Ready**: Health checks, lazy loading, and error handling
 
 This guide is intentionally written in a **clear, structured, educational** style suitable for students, ML engineers, and DevOps/MLOps practitioners.
 
@@ -17,16 +18,37 @@ This guide is intentionally written in a **clear, structured, educational** styl
 ```
 mlflow-eval/
 │
-├── classification.py        # XGBoost classification evaluation
-├── regressor.py             # Linear regression evaluation
-├── requirements.txt         # Python dependencies
-├── Dockerfile               # Docker image for Python app
-├── Dockerfile.mlflow-server # Docker image for MLflow server
-├── docker-compose.yml       # Docker Compose configuration
-├── entrypoint-mlflow.sh     # MLflow server startup script
-├── README.md                # Documentation (this file)
-├── data/                    # Data directory (for local development)
-└── venv/                    # Virtual environment (ignored)
+├── # Lab Scripts (7 ML Models)
+├── lab1_logistic_regression.py      # Logistic Regression (Breast Cancer)
+├── lab2_decision_tree_regressor.py  # Decision Tree Regressor (California Housing)
+├── lab3_kmeans_clustering.py        # K-Means Clustering (Iris)
+├── lab4_random_forest_classifier.py # Random Forest (Iris)
+├── lab5_isolation_forest.py         # Isolation Forest (Breast Cancer)
+├── classification.py                # XGBoost Classifier (Adult Dataset)
+├── regressor.py                     # Linear Regressor (California Housing)
+│
+├── # API Server
+├── api_server.py                    # FastAPI prediction endpoints
+│
+├── # Docker Configuration
+├── Dockerfile                       # Docker image for Python app
+├── Dockerfile.mlflow-server        # Docker image for MLflow server
+├── Dockerfile.api                   # Docker image for FastAPI server
+├── docker-compose.yml               # Docker Compose configuration
+├── entrypoint-mlflow.sh             # MLflow server startup script
+│
+├── # Documentation
+├── README.md                        # Main documentation (this file)
+├── MEDIUM.md                        # Comprehensive guide with theory & diagrams
+├── POSTMAN_EXAMPLES.md              # Postman API testing guide
+├── API_SUMMARY.md                   # Quick API reference
+│
+├── # Configuration
+├── requirements.txt                 # Python dependencies
+├── pip.conf                         # Pip configuration for timeouts
+├── run_all_experiments.sh           # Run all experiments (Linux/Mac)
+├── run_all_experiments.bat          # Run all experiments (Windows)
+└── test_api.py                      # API testing script
 ```
 
 ---
@@ -81,6 +103,13 @@ MLflow is an open-source platform to manage the end-to-end ML lifecycle.
                             |               |
           Backend Store --->|               |<--- Artifact Store
                     (PostgreSQL)            (Docker Volume: mlruns/)
+                            |               |
+                            |               |
+                     +------+---------------+-------+
+                     |      FastAPI Server          |
+                     |  (Runs on port 8000)        |
+                     |  Prediction Endpoints       |
+                     +------------------------------+
 ```
 
 ---
@@ -116,25 +145,26 @@ This project includes Docker and Docker Compose configuration for easy setup and
 
 ### **Docker Architecture**
 
-The Docker setup consists of three services working together:
+The Docker setup consists of four services working together:
 
 ```
-+------------------+         +------------------+         +------------------+
-|   PostgreSQL     |         |  mlflow-server   |         |   mlflow-app     |
-|   (Port 5432)    |<--------|  (Port 5000)     |<--------|  (Python App)    |
-+------------------+         +------------------+         +------------------+
-      |                              |                              |
-      v                              v                              v
-+------------------+         +------------------+         +------------------+
-|  postgres-data   |         | mlflow-artifacts |         |  Project Files   |
-|  (Volume)        |         |    (Volume)      |         |   (Bind Mount)    |
-+------------------+         +------------------+         +------------------+
++------------------+    +------------------+    +------------------+    +------------------+
+|   PostgreSQL     |    |  mlflow-server   |    |   mlflow-app     |    |   mlflow-api     |
+|   (Port 5432)    |<---|  (Port 5000)      |<---|  (Python App)    |    |  (Port 8000)     |
++------------------+    +------------------+    +------------------+    +------------------+
+      |                        |                        |                        |
+      v                        v                        v                        v
++------------------+    +------------------+    +------------------+    +------------------+
+|  postgres-data   |    | mlflow-artifacts |    |  Project Files   |    |  Model Cache     |
+|  (Volume)        |    |    (Volume)      |    |   (Bind Mount)    |    |  (In-Memory)     |
++------------------+    +------------------+    +------------------+    +------------------+
 ```
 
 **Service Communication Flow:**
 1. **PostgreSQL** stores all MLflow metadata (experiments, runs, metrics, parameters)
 2. **MLflow Server** reads/writes to PostgreSQL and serves the UI on port 5000
 3. **MLflow App** runs evaluation scripts and sends data to MLflow Server via HTTP
+4. **MLflow API** loads models from MLflow Server and serves prediction endpoints on port 8000
 
 ### **How Components Work Together**
 
@@ -160,6 +190,16 @@ This file defines the entire stack:
   - Depends on MLflow Server being healthy
   - Mounts project directory for access to Python scripts
   - Receives MLflow server URI via environment variable
+
+- **MLflow API Service** (FastAPI):
+  - Built from `Dockerfile.api` (contains FastAPI and model dependencies)
+  - Depends on MLflow Server being healthy
+  - Loads models from MLflow experiments on startup (background loading, non-blocking)
+  - Provides RESTful prediction endpoints on port 8000
+  - Implements lazy loading for models not yet loaded
+  - Shares `mlflow-artifacts` volume with MLflow Server for model access
+  - Health check allows 10 minutes (600s) for model loading
+  - Uses CORS middleware for cross-origin requests
 
 #### **2. Dockerfile.mlflow-server - Server Image**
 
@@ -227,7 +267,7 @@ When you run `docker-compose exec mlflow-app python classification.py`:
 
 - **mlflow-artifacts**: Persistent storage for model files and plots
   - Saved models, confusion matrices, ROC curves, SHAP plots
-  - Shared between `mlflow-server` and `mlflow-app`
+  - Shared between `mlflow-server`, `mlflow-app`, and `mlflow-api`
   - Survives container restarts
 
 ### **Build and Run with Docker Compose**
@@ -240,7 +280,8 @@ docker-compose build
 
 This command will:
 - Build the `mlflow-app` image with all Python dependencies
-- Prepare the `mlflow-server` image (uses base Python image)
+- Build the `mlflow-server` image with MLflow and PostgreSQL client
+- Build the `mlflow-api` image with FastAPI and model dependencies
 
 #### **Step 2: Start the Services**
 
@@ -249,10 +290,12 @@ docker-compose up -d
 ```
 
 This command will:
+- Start PostgreSQL database on port 5432
 - Start the MLflow tracking server on port 5000
-- Start the Python application container
-- Create shared volumes for `mlruns/` and `mlflow.db`
-- Wait for the MLflow server to be healthy before starting the app container
+- Start the Python application container (for running evaluation scripts)
+- Start the FastAPI prediction server on port 8000
+- Create shared volumes for PostgreSQL data and MLflow artifacts
+- Wait for services to be healthy before starting dependent services
 
 #### **Step 3: Verify Services are Running**
 
@@ -260,9 +303,13 @@ This command will:
 docker-compose ps
 ```
 
-You should see both services running:
-- `mlflow-server` (healthy)
-- `mlflow-app` (running)
+You should see all services running:
+- `postgres` (container: `mlflow-postgres`, healthy)
+- `mlflow-server` (container: `mlflow-server`, healthy)
+- `mlflow-app` (container: `mlflow-app`, running)
+- `mlflow-api` (container: `mlflow-api`, healthy)
+
+**Note:** The `mlflow-api` health check allows 10 minutes for model loading on startup.
 
 #### **Step 4: Access MLflow UI**
 
@@ -273,18 +320,63 @@ http://localhost:5000
 
 You should see the MLflow Tracking UI with no experiments yet.
 
+#### **Step 5: Access FastAPI Prediction API**
+
+Open your browser and navigate to:
+```
+http://localhost:8000/docs
+```
+
+You should see the interactive Swagger UI for the prediction API. The API provides endpoints for all 7 trained models.
+
+**Health Check:**
+```
+http://localhost:8000/health
+```
+
+**API Root:**
+```
+http://localhost:8000/
+```
+
 ### **Running Evaluation Scripts**
 
 #### **Option 1: Execute Scripts in Container**
 
-Run the classification evaluation:
+Run individual experiments:
 ```bash
+# Lab 1: Logistic Regression
+docker-compose exec mlflow-app python lab1_logistic_regression.py
+
+# Lab 2: Decision Tree Regressor
+docker-compose exec mlflow-app python lab2_decision_tree_regressor.py
+
+# Lab 3: K-Means Clustering
+docker-compose exec mlflow-app python lab3_kmeans_clustering.py
+
+# Lab 4: Random Forest Classifier
+docker-compose exec mlflow-app python lab4_random_forest_classifier.py
+
+# Lab 5: Isolation Forest
+docker-compose exec mlflow-app python lab5_isolation_forest.py
+
+# XGBoost Classifier
 docker-compose exec mlflow-app python classification.py
+
+# Linear Regressor
+docker-compose exec mlflow-app python regressor.py
 ```
 
-Run the regression evaluation:
+#### **Option 1b: Run All Experiments**
+
+On Linux/Mac:
 ```bash
-docker-compose exec mlflow-app python regressor.py
+docker-compose exec mlflow-app bash -c "./run_all_experiments.sh"
+```
+
+On Windows:
+```bash
+docker-compose exec mlflow-app bash -c "./run_all_experiments.bat"
 ```
 
 #### **Option 2: Run Scripts Interactively**
@@ -311,6 +403,8 @@ View logs from a specific service:
 ```bash
 docker-compose logs -f mlflow-server
 docker-compose logs -f mlflow-app
+docker-compose logs -f mlflow-api
+docker-compose logs -f postgres
 ```
 
 ### **Stopping Services**
@@ -341,7 +435,12 @@ docker-compose up -d
 - **Artifact Store**: `mlruns/` directory (persistent in `mlflow-artifacts` volume)
 - **Networking**: Services communicate via Docker's internal network
 - **Environment Variables**: Connection details passed via docker-compose.yml
-- **Health Checks**: Ensures services start in correct order (PostgreSQL → MLflow Server → MLflow App)
+- **Health Checks**: Ensures services start in correct order (PostgreSQL → MLflow Server → MLflow App & MLflow API)
+- **Service Names**: 
+  - `postgres` (container: `mlflow-postgres`)
+  - `mlflow-server` (container: `mlflow-server`)
+  - `mlflow-app` (container: `mlflow-app`)
+  - `mlflow-api` (container: `mlflow-api`)
 
 ---
 
@@ -837,10 +936,12 @@ If any test fails:
 You now have:
 - **Fully containerized MLflow setup** with Docker Compose
 - **PostgreSQL backend** for reliable data persistence (works on Windows, Linux, macOS)
-- **Fully working classification + regression evaluation pipelines**
+- **7 Machine Learning models** covering classification, regression, clustering, and anomaly detection
+- **FastAPI prediction API** with RESTful endpoints for real-time predictions
 - **Proper MLflow server configuration** with health checks and dependency management
 - **SHAP-based explainability** for model interpretation
 - **Automatic metrics & artifact logging** to MLflow UI
+- **Lazy model loading** for efficient resource usage
 - **Clean, reproducible ML evaluation workflow** with isolated environments
 
 ### **Architecture Benefits**

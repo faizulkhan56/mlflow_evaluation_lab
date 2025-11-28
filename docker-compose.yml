@@ -66,6 +66,30 @@ services:
     # Remove this line if you want classification.py to run automatically on startup
     command: tail -f /dev/null
 
+  # FastAPI Prediction API Server
+  mlflow-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: mlflow-api
+    ports:
+      - "8000:8000"
+    depends_on:
+      mlflow-server:
+        condition: service_healthy
+    volumes:
+      - mlflow-artifacts:/app/mlruns
+    environment:
+      - MLFLOW_TRACKING_URI=http://mlflow-server:5000
+      - MLFLOW_REGISTRY_URI=http://mlflow-server:5000
+      - GIT_PYTHON_REFRESH=quiet
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 600s  # Allow 10 minutes for model loading
+
 # Named volumes for data persistence
 volumes:
   postgres-data:
