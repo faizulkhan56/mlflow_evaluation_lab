@@ -1,0 +1,24 @@
+# Dockerfile for MLflow Tracking Server
+FROM python:3.11-slim
+
+# Install system dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl postgresql-client && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install MLflow and PostgreSQL adapter
+RUN pip install --no-cache-dir mlflow psycopg2-binary
+
+# Set working directory
+WORKDIR /app
+
+# Expose MLflow port
+EXPOSE 5000
+
+# Copy entrypoint script
+COPY entrypoint-mlflow.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Set entrypoint
+ENTRYPOINT ["/entrypoint.sh"]
+

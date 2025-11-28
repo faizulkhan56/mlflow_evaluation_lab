@@ -1,0 +1,147 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+
+# MLflow generated files
+mlruns/
+mlflow.db
+*.db
+.mlflow/
+
+# Docker
+.docker/
+docker-compose.override.yml
+*.log
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDE - VSCode
+.vscode/
+*.code-workspace
+
+# IDE - PyCharm
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# IDE - Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# IDE - Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# OS - macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# OS - Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+Desktop.ini
+$RECYCLE.BIN/
+
+# OS - Linux
+*~
+.directory
+.Trash-*
+
+# Data files (uncomment if you don't want to track data)
+# *.csv
+# *.parquet
+# *.h5
+# *.hdf5
+# data/
+# datasets/
+
+# Model files (uncomment if models are large)
+# *.pkl
+# *.joblib
+# *.h5
+# *.pb
+# *.onnx
+# models/
+
+# Logs
+*.log
+logs/
+*.out
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.cache/
+
+# Coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# Jupyter Notebook Checkpoints
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# Backup files
+*.bak
+*.backup
+*~
+
