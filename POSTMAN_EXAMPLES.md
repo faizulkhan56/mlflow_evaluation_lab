@@ -20,13 +20,15 @@ Interactive API docs available at: `http://localhost:8000/docs`
 ```json
 {
   "status": "healthy",
-  "models_loaded": 7,
+  "models_loaded": 9,
   "models": [
     "lab1_logistic_regression",
     "lab2_decision_tree_regressor",
     "lab3_kmeans_clustering",
     "lab4_random_forest",
     "lab5_isolation_forest",
+    "lab6_wine_quality_autolog",
+    "lab7_wine_quality_manual",
     "xgboost_classifier",
     "linear_regressor"
   ]
@@ -230,7 +232,81 @@ Interactive API docs available at: `http://localhost:8000/docs`
 
 ---
 
-## 7. XGBoost Classifier (Adult Dataset)
+## 7. Lab 6: Wine Quality Classification (Autologging)
+
+**POST** `/predict/lab6-wine-quality-autologging`
+
+**Request Body (JSON):**
+```json
+{
+  "fixed_acidity": 7.4,
+  "volatile_acidity": 0.7,
+  "citric_acid": 0.0,
+  "residual_sugar": 1.9,
+  "chlorides": 0.076,
+  "free_sulfur_dioxide": 11.0,
+  "total_sulfur_dioxide": 34.0,
+  "density": 0.9978,
+  "pH": 3.51,
+  "sulphates": 0.56,
+  "alcohol": 9.4
+}
+```
+
+**Response:**
+```json
+{
+  "prediction": 0,
+  "prediction_label": "bad",
+  "prediction_probability": {
+    "bad": 0.85,
+    "good": 0.15
+  },
+  "model_name": "lab6-wine-quality-autologging",
+  "prediction_type": "classification"
+}
+```
+
+---
+
+## 8. Lab 7: Wine Quality Classification (Manual Logging)
+
+**POST** `/predict/lab7-wine-quality-manual`
+
+**Request Body (JSON):**
+```json
+{
+  "fixed_acidity": 7.4,
+  "volatile_acidity": 0.7,
+  "citric_acid": 0.0,
+  "residual_sugar": 1.9,
+  "chlorides": 0.076,
+  "free_sulfur_dioxide": 11.0,
+  "total_sulfur_dioxide": 34.0,
+  "density": 0.9978,
+  "pH": 3.51,
+  "sulphates": 0.56,
+  "alcohol": 9.4
+}
+```
+
+**Response:**
+```json
+{
+  "prediction": 0,
+  "prediction_label": "bad",
+  "prediction_probability": {
+    "bad": 0.85,
+    "good": 0.15
+  },
+  "model_name": "lab7-wine-quality-manual",
+  "prediction_type": "classification"
+}
+```
+
+---
+
+## 9. XGBoost Classifier (Adult Dataset)
 
 **POST** `/predict/xgboost-classifier`
 
@@ -270,7 +346,7 @@ Interactive API docs available at: `http://localhost:8000/docs`
 
 ---
 
-## 8. Linear Regressor (California Housing)
+## 10. Linear Regressor (California Housing)
 
 **POST** `/predict/linear-regressor`
 
@@ -449,6 +525,44 @@ curl -X POST "http://localhost:8000/predict/lab5-isolation-forest" \
   }'
 ```
 
+### Lab 6 - Wine Quality Autologging
+```bash
+curl -X POST "http://localhost:8000/predict/lab6-wine-quality-autologging" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "fixed_acidity": 7.4,
+    "volatile_acidity": 0.7,
+    "citric_acid": 0.0,
+    "residual_sugar": 1.9,
+    "chlorides": 0.076,
+    "free_sulfur_dioxide": 11.0,
+    "total_sulfur_dioxide": 34.0,
+    "density": 0.9978,
+    "pH": 3.51,
+    "sulphates": 0.56,
+    "alcohol": 9.4
+  }'
+```
+
+### Lab 7 - Wine Quality Manual
+```bash
+curl -X POST "http://localhost:8000/predict/lab7-wine-quality-manual" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "fixed_acidity": 7.4,
+    "volatile_acidity": 0.7,
+    "citric_acid": 0.0,
+    "residual_sugar": 1.9,
+    "chlorides": 0.076,
+    "free_sulfur_dioxide": 11.0,
+    "total_sulfur_dioxide": 34.0,
+    "density": 0.9978,
+    "pH": 3.51,
+    "sulphates": 0.56,
+    "alcohol": 9.4
+  }'
+```
+
 ### XGBoost Classifier
 ```bash
 curl -X POST "http://localhost:8000/predict/xgboost-classifier" \
@@ -493,7 +607,47 @@ curl -X POST "http://localhost:8000/predict/linear-regressor" \
 
 1. **Start Services**: `docker-compose up -d`
 2. **Train Models**: Run all training scripts first
+   ```bash
+   # Run all lab scripts including Lab 6 and Lab 7
+   docker-compose exec mlflow-app python lab1_logistic_regression.py
+   docker-compose exec mlflow-app python lab2_decision_tree_regressor.py
+   docker-compose exec mlflow-app python lab3_kmeans_clustering.py
+   docker-compose exec mlflow-app python lab4_random_forest_classifier.py
+   docker-compose exec mlflow-app python lab5_isolation_forest.py
+   docker-compose exec mlflow-app python lab6_wine_quality_autologging.py
+   docker-compose exec mlflow-app python lab7_wine_quality_manual.py
+   docker-compose exec mlflow-app python classification.py
+   docker-compose exec mlflow-app python regressor.py
+   ```
 3. **Check Health**: `GET http://localhost:8000/health`
 4. **Test Predictions**: Use Postman or cURL examples above
 5. **View API Docs**: `http://localhost:8000/docs` (Swagger UI)
+
+## Note on Lab 6 and Lab 7
+
+**Lab 6 (Wine Quality Autologging)** and **Lab 7 (Wine Quality Manual Logging)** are evaluation scripts that demonstrate MLflow logging capabilities. They:
+
+- Train Random Forest models on Wine Quality dataset
+- Demonstrate autologging vs manual logging approaches
+- Use Kaggle API for dataset download (with UCI fallback)
+- Log comprehensive metrics and artifacts to MLflow
+- **Both have API prediction endpoints** (see sections 7 and 8 above)
+
+**To run these labs:**
+```bash
+# Lab 6: Autologging demonstration
+docker-compose exec mlflow-app python lab6_wine_quality_autologging.py
+
+# Lab 7: Manual logging demonstration
+docker-compose exec mlflow-app python lab7_wine_quality_manual.py
+```
+
+**Kaggle Setup (Optional):**
+- Create `.env` file with `KAGGLE_USERNAME` and `KAGGLE_KEY`
+- See `KAGGLE_SETUP.md` for detailed instructions
+- If not configured, scripts automatically use UCI ML Repository
+
+**API Endpoints:**
+- Lab 6: `POST /predict/lab6-wine-quality-autologging`
+- Lab 7: `POST /predict/lab7-wine-quality-manual`
 

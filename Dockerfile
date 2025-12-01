@@ -23,7 +23,9 @@ RUN pip install --upgrade pip && \
     pip install --no-cache-dir --default-timeout=100 --retries 5 \
     pandas>=1.5.0 numpy>=1.24.0 psycopg2-binary>=2.9.0 && \
     pip install --no-cache-dir --default-timeout=100 --retries 5 \
-    fastapi>=0.104.0 uvicorn[standard]>=0.24.0 pydantic>=2.0.0 requests>=2.31.0
+    fastapi>=0.104.0 uvicorn[standard]>=0.24.0 pydantic>=2.0.0 requests>=2.31.0 && \
+    pip install --no-cache-dir --default-timeout=100 --retries 5 \
+    matplotlib>=3.5.0 seaborn>=0.12.0 kaggle>=1.5.0
 
 # Copy application files
 COPY classification.py .

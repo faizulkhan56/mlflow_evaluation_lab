@@ -2,7 +2,7 @@
 
 ## 📘 1. Introduction
 This project demonstrates how to evaluate Machine Learning models using **MLflow**, covering:
-- **7 Machine Learning Models**: Logistic Regression, Decision Tree Regressor, K-Means Clustering, Random Forest Classifier, Isolation Forest, XGBoost Classifier, and Linear Regressor
+- **9 Machine Learning Models**: Logistic Regression, Decision Tree Regressor, K-Means Clustering, Random Forest Classifier, Isolation Forest, Wine Quality (Autologging), Wine Quality (Manual Logging), XGBoost Classifier, and Linear Regressor
 - **MLflow Tracking**: Complete experiment tracking with PostgreSQL backend
 - **FastAPI Prediction API**: RESTful endpoints for real-time model predictions
 - **Docker Deployment**: Fully containerized setup with Docker Compose
@@ -18,14 +18,19 @@ This guide is intentionally written in a **clear, structured, educational** styl
 ```
 mlflow-eval/
 │
-├── # Lab Scripts (7 ML Models)
+├── # Lab Scripts (9 ML Models)
 ├── lab1_logistic_regression.py      # Logistic Regression (Breast Cancer)
 ├── lab2_decision_tree_regressor.py  # Decision Tree Regressor (California Housing)
 ├── lab3_kmeans_clustering.py        # K-Means Clustering (Iris)
 ├── lab4_random_forest_classifier.py # Random Forest (Iris)
 ├── lab5_isolation_forest.py         # Isolation Forest (Breast Cancer)
+├── lab6_wine_quality_autologging.py # Wine Quality (Autologging)
+├── lab7_wine_quality_manual.py      # Wine Quality (Manual Logging)
 ├── classification.py                # XGBoost Classifier (Adult Dataset)
 ├── regressor.py                     # Linear Regressor (California Housing)
+│
+├── # Dataset Loader
+├── dataset_loader.py                # Kaggle/UCI dataset download helper
 │
 ├── # API Server
 ├── api_server.py                    # FastAPI prediction endpoints

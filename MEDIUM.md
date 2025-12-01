@@ -520,7 +520,115 @@ The dataset contains measurements of cell nuclei from breast mass images. Featur
 
 ---
 
+### 2.5 Wine Quality Red Dataset
+
+**Source:** Kaggle API (`uciml/red-wine-quality-cortez-et-al-2009`) or UCI ML Repository
+
+**Purpose:** Binary classification (wine quality prediction: good vs. bad)
+
+**Dataset Characteristics:**
+- **Samples**: 1,599
+- **Features**: 11 (all numeric, physicochemical properties)
+- **Target**: Binary (quality >= 7 is "good", quality < 7 is "bad")
+- **Classes**: 2 (Good: ~217, Bad: ~1,382)
+
+**Input Features (11 features):**
+
+1. **`fixed acidity`** - Fixed acidity (tartaric acid - g/dm³)
+   - Range: 4.6 to 15.9
+
+2. **`volatile acidity`** - Volatile acidity (acetic acid - g/dm³)
+   - Range: 0.12 to 1.58
+
+3. **`citric acid`** - Citric acid (g/dm³)
+   - Range: 0.0 to 1.0
+
+4. **`residual sugar`** - Residual sugar (g/dm³)
+   - Range: 0.9 to 15.5
+
+5. **`chlorides`** - Chlorides (sodium chloride - g/dm³)
+   - Range: 0.012 to 0.611
+
+6. **`free sulfur dioxide`** - Free sulfur dioxide (mg/dm³)
+   - Range: 1 to 72
+
+7. **`total sulfur dioxide`** - Total sulfur dioxide (mg/dm³)
+   - Range: 6 to 289
+
+8. **`density`** - Density (g/cm³)
+   - Range: 0.99007 to 1.00369
+
+9. **`pH`** - pH (acidity/basicity)
+   - Range: 2.74 to 4.01
+
+10. **`sulphates`** - Sulphates (potassium sulphate - g/dm³)
+    - Range: 0.33 to 2.0
+
+11. **`alcohol`** - Alcohol content (% by volume)
+    - Range: 8.4 to 14.9
+
+**Target Feature:**
+- **`quality`**: Wine quality score (0-10 scale)
+  - **Binary Classification**: `quality >= 7` = Good (1), `quality < 7` = Bad (0)
+  - Original scale: 3 to 8 (no wines rated 0, 1, 2, 9, or 10 in this dataset)
+
+**Dataset Download:**
+- **Primary Method**: Kaggle API (requires credentials in `.env` file)
+- **Fallback Method**: UCI ML Repository (automatic if Kaggle unavailable)
+- **Helper Module**: `dataset_loader.py` handles download automatically
+
+**Used In:**
+- Lab 6: Wine Quality Classification with Autologging
+- Lab 7: Wine Quality Classification with Manual Logging
+
+---
+
 ## 3. Code Explanations
+
+### 3.0 Dataset Loader and Kaggle Integration
+
+**Dataset Loader Module (`dataset_loader.py`):**
+
+The project includes a helper module for downloading datasets, particularly the Wine Quality dataset. This module supports:
+
+1. **Kaggle API Integration**: Downloads from Kaggle if credentials are provided
+2. **UCI ML Repository Fallback**: Automatically falls back if Kaggle is unavailable
+3. **Local Caching**: Saves dataset locally to avoid repeated downloads
+
+**Setup for Kaggle API:**
+
+1. Create `.env` file in project root:
+   ```
+   KAGGLE_USERNAME=your-username
+   KAGGLE_KEY=your-api-key
+   ```
+
+2. Update `docker-compose.yml` to read from `.env`:
+   ```yaml
+   environment:
+     - KAGGLE_USERNAME=${KAGGLE_USERNAME}
+     - KAGGLE_KEY=${KAGGLE_KEY}
+   ```
+
+3. Rebuild containers:
+   ```bash
+   docker-compose build
+   docker-compose up -d
+   ```
+
+**Usage in Lab Scripts:**
+```python
+from dataset_loader import load_wine_quality_dataset
+data = load_wine_quality_dataset()  # Automatically handles download
+```
+
+**Benefits:**
+- Seamless dataset acquisition
+- Works with or without Kaggle credentials
+- Consistent dataset location across all scripts
+- No manual download steps required
+
+---
 
 ### 3.1 Lab 1: Logistic Regression (`lab1_logistic_regression.py`)
 
@@ -902,7 +1010,278 @@ with mlflow.start_run():
 
 ---
 
-### 3.8 FastAPI Prediction Service (`api_server.py`)
+### 3.8 Dataset Loader (`dataset_loader.py`)
+
+**Purpose:** Helper module for downloading Wine Quality dataset from Kaggle or UCI ML Repository
+
+**Key Features:**
+- Automatic dataset download with fallback mechanism
+- Supports Kaggle API (if credentials provided) or UCI ML Repository
+- Handles file extraction and path management
+- Caches dataset locally to avoid repeated downloads
+
+**Code Flow:**
+
+```python
+def load_wine_quality_dataset(data_file="data/winequality-red.csv"):
+    # 1. Check if local file exists
+    if os.path.exists(data_file):
+        return pd.read_csv(data_file, sep=";")
+    
+    # 2. Try Kaggle API (if credentials available)
+    if KAGGLE_USERNAME and KAGGLE_KEY:
+        try:
+            api = KaggleApi()
+            api.authenticate()
+            api.dataset_download_files(
+                "uciml/red-wine-quality-cortez-et-al-2009",
+                path="data",
+                unzip=True
+            )
+            # Find and return CSV file
+        except Exception:
+            # Fallback to UCI
+            pass
+    
+    # 3. Fallback to UCI ML Repository
+    data_url = "https://archive.ics.uci.edu/ml/..."
+    data = pd.read_csv(data_url, sep=";")
+    data.to_csv(data_file, index=False)
+    return data
+```
+
+**Usage:**
+```python
+from dataset_loader import load_wine_quality_dataset
+data = load_wine_quality_dataset()
+```
+
+**Configuration:**
+- Kaggle credentials: Set `KAGGLE_USERNAME` and `KAGGLE_KEY` in `.env` file
+- Dataset location: `data/winequality-red.csv` (created automatically)
+
+---
+
+### 3.9 Lab 6: Wine Quality Classification with Autologging (`lab6_wine_quality_autologging.py`)
+
+**Purpose:** Binary classification of wine quality using Random Forest with MLflow autologging
+
+**Key Feature:** Demonstrates MLflow's autologging capability, which automatically logs parameters, metrics, and models without manual intervention.
+
+**Code Flow:**
+
+```python
+# 1. Setup and Configuration
+- Set MLflow tracking URI
+- Create/select experiment: "lab6-wine-quality-autologging"
+- Load Wine Quality dataset using dataset_loader
+
+# 2. Data Preparation
+- Load dataset (downloads from Kaggle or UCI if needed)
+- Binary classification: quality >= 7 is "good" (1), else "bad" (0)
+- Split: 80% train, 20% test
+
+# 3. Enable Autologging
+mlflow.sklearn.autolog()  # Enable automatic logging
+
+# 4. Model Training (Autologging Active)
+with mlflow.start_run(run_name="random_forest_autolog"):
+    # Train Random Forest
+    model = RandomForestClassifier(
+        n_estimators=100,
+        max_depth=5,
+        random_state=42
+    )
+    model.fit(X_train, y_train)
+    
+    # Autologging automatically logs:
+    # - Model parameters (n_estimators, max_depth, etc.)
+    # - Training metrics (if available)
+    # - Model artifacts
+    # - Model signature
+    
+    # Generate predictions
+    y_pred = model.predict(X_test)
+    accuracy = accuracy_score(y_test, y_pred)
+    
+    # Infer signature explicitly
+    signature = infer_signature(X_test, y_pred)
+    
+    # Log model with signature
+    mlflow.sklearn.log_model(model, "model", signature=signature)
+    
+    # MLflow evaluation for additional metrics
+    result = mlflow_evaluate(...)
+
+# 5. Disable Autologging
+mlflow.sklearn.autolog(disable=True)
+```
+
+**Key Components:**
+- **Autologging**: Automatically captures model parameters, metrics, and artifacts
+- **Dataset Integration**: Uses `dataset_loader.py` for automatic dataset download
+- **Kaggle Support**: Downloads from Kaggle if credentials are available in `.env`
+- **Fallback Mechanism**: Automatically falls back to UCI ML Repository if Kaggle unavailable
+
+**What Autologging Logs Automatically:**
+- Model hyperparameters (n_estimators, max_depth, random_state, etc.)
+- Model signature (input/output schema)
+- Model artifacts (saved model files)
+- Training time and metadata
+- Additional sklearn-specific metrics (if available)
+
+**Evaluation Metrics:**
+- Accuracy, F1 Score, ROC AUC, Precision, Recall (via MLflow evaluators)
+
+**Running the Lab:**
+```bash
+# With Docker
+docker-compose exec mlflow-app python lab6_wine_quality_autologging.py
+
+# Prerequisites: .env file with Kaggle credentials (optional)
+# KAGGLE_USERNAME=your-username
+# KAGGLE_KEY=your-api-key
+```
+
+---
+
+### 3.10 Lab 7: Wine Quality Classification with Manual Logging (`lab7_wine_quality_manual.py`)
+
+**Purpose:** Binary classification of wine quality using Random Forest with manual MLflow logging
+
+**Key Feature:** Demonstrates explicit manual logging of parameters, metrics, artifacts, and models, providing full control over what gets logged.
+
+**Code Flow:**
+
+```python
+# 1. Setup and Configuration
+- Set MLflow tracking URI
+- Create/select experiment: "lab7-wine-quality-manual"
+- Load Wine Quality dataset using dataset_loader
+
+# 2. Data Preparation
+- Load dataset (downloads from Kaggle or UCI if needed)
+- Binary classification: quality >= 7 is "good" (1), else "bad" (0)
+- Split: 80% train, 20% test
+
+# 3. Model Training
+model = RandomForestClassifier(
+    n_estimators=100,
+    max_depth=5,
+    random_state=42,
+    criterion="gini"
+)
+model.fit(X_train, y_train)
+
+# 4. Manual Logging
+with mlflow.start_run(run_name="random_forest_manual"):
+    # Manual logging: Parameters
+    mlflow.log_params({
+        "n_estimators": 100,
+        "max_depth": 5,
+        "random_state": 42,
+        "criterion": "gini"
+    })
+    
+    # Calculate metrics
+    y_pred = model.predict(X_test)
+    accuracy = accuracy_score(y_test, y_pred)
+    cm = confusion_matrix(y_test, y_pred)
+    precision = tp / (tp + fp)
+    recall = tp / (tp + fn)
+    f1 = 2 * (precision * recall) / (precision + recall)
+    
+    # Manual logging: Metrics
+    mlflow.log_metric("accuracy", accuracy)
+    mlflow.log_metric("precision", precision)
+    mlflow.log_metric("recall", recall)
+    mlflow.log_metric("f1_score", f1)
+    mlflow.log_metric("true_positives", float(tp))
+    mlflow.log_metric("true_negatives", float(tn))
+    mlflow.log_metric("false_positives", float(fp))
+    mlflow.log_metric("false_negatives", float(fn))
+    
+    # Manual logging: Confusion Matrix as artifact
+    plt.figure(figsize=(8, 6))
+    sns.heatmap(cm, annot=True, fmt="d", cmap="Blues")
+    plt.savefig("rf_manual_confusion_matrix.png")
+    mlflow.log_artifact("rf_manual_confusion_matrix.png")
+    
+    # Manual logging: Classification Report as artifact
+    report = classification_report(y_test, y_pred, output_dict=True)
+    report_df = pd.DataFrame(report).transpose()
+    report_df.to_csv("rf_manual_classification_report.csv")
+    mlflow.log_artifact("rf_manual_classification_report.csv")
+    
+    # Manual logging: Feature Importance Plot as artifact
+    feature_importance = pd.DataFrame({
+        "feature": X.columns,
+        "importance": model.feature_importances_
+    }).sort_values("importance", ascending=False)
+    # Create and save plot
+    mlflow.log_artifact("rf_manual_feature_importance.png")
+    
+    # Manual logging: Model
+    signature = infer_signature(X_test, y_pred)
+    mlflow.sklearn.log_model(model, "model", signature=signature)
+    
+    # Manual logging: Dataset info
+    mlflow.log_param("dataset_size", len(data))
+    mlflow.log_param("train_size", len(X_train))
+    mlflow.log_param("test_size", len(X_test))
+    mlflow.log_param("n_features", len(X.columns))
+    
+    # MLflow evaluation for additional metrics
+    result = mlflow_evaluate(...)
+```
+
+**Key Components:**
+- **Manual Parameter Logging**: Explicitly logs all hyperparameters
+- **Manual Metric Logging**: Calculates and logs custom metrics
+- **Artifact Logging**: Saves plots and reports as artifacts
+  - Confusion matrix heatmap
+  - Classification report (CSV)
+  - Feature importance plot
+- **Dataset Integration**: Uses `dataset_loader.py` for automatic dataset download
+- **Kaggle Support**: Downloads from Kaggle if credentials are available in `.env`
+
+**What Gets Logged Manually:**
+- Model hyperparameters (via `mlflow.log_params()`)
+- Evaluation metrics (via `mlflow.log_metric()`)
+- Visualization artifacts (confusion matrix, feature importance plots)
+- Data artifacts (classification reports)
+- Model file (via `mlflow.sklearn.log_model()`)
+- Dataset metadata (size, splits, feature count)
+
+**Evaluation Metrics:**
+- Accuracy, Precision, Recall, F1 Score (manually calculated)
+- Additional metrics via MLflow evaluators (ROC AUC, etc.)
+
+**Running the Lab:**
+```bash
+# With Docker
+docker-compose exec mlflow-app python lab7_wine_quality_manual.py
+
+# Prerequisites: .env file with Kaggle credentials (optional)
+# KAGGLE_USERNAME=your-username
+# KAGGLE_KEY=your-api-key
+```
+
+**Comparison: Autologging vs Manual Logging**
+
+| Feature | Autologging (Lab 6) | Manual Logging (Lab 7) |
+|---------|---------------------|------------------------|
+| **Setup** | One line: `mlflow.sklearn.autolog()` | Multiple explicit calls |
+| **Parameters** | Auto-logged | Manually logged |
+| **Metrics** | Auto-logged (basic) | Custom metrics possible |
+| **Artifacts** | Model only | Model + plots + reports |
+| **Control** | Limited | Full control |
+| **Customization** | Less flexible | Highly customizable |
+| **Use Case** | Quick experiments | Production-ready logging |
+
+---
+
+### 3.11 FastAPI Prediction Service (`api_server.py`)
 
 **Purpose:** RESTful API for real-time model predictions
 
@@ -1636,9 +2015,13 @@ GET http://localhost:8000/health
    docker-compose exec mlflow-app python lab3_kmeans_clustering.py
    docker-compose exec mlflow-app python lab4_random_forest_classifier.py
    docker-compose exec mlflow-app python lab5_isolation_forest.py
+   docker-compose exec mlflow-app python lab6_wine_quality_autologging.py
+   docker-compose exec mlflow-app python lab7_wine_quality_manual.py
    docker-compose exec mlflow-app python classification.py
    docker-compose exec mlflow-app python regressor.py
    ```
+   
+   **Note:** Lab 6 and Lab 7 require Kaggle API credentials (optional). If not configured, they automatically use UCI ML Repository. See `KAGGLE_SETUP.md` for setup instructions.
 
 3. **Verify Health:**
    - GET `http://localhost:8000/health`
@@ -1875,6 +2258,8 @@ graph TB
         LAB3[lab3_kmeans_clustering.py]
         LAB4[lab4_random_forest_classifier.py]
         LAB5[lab5_isolation_forest.py]
+        LAB6[lab6_wine_quality_autologging.py<br/>Autologging]
+        LAB7[lab7_wine_quality_manual.py<br/>Manual Logging]
         CLASS[classification.py<br/>XGBoost]
         REG[regressor.py<br/>Linear Regression]
     end
@@ -1897,6 +2282,8 @@ graph TB
     LAB3 --> EXP
     LAB4 --> EXP
     LAB5 --> EXP
+    LAB6 --> EXP
+    LAB7 --> EXP
     CLASS --> EXP
     REG --> EXP
     
@@ -1914,6 +2301,8 @@ graph TB
     style LAB3 fill:#FF6B6B
     style LAB4 fill:#FF6B6B
     style LAB5 fill:#FF6B6B
+    style LAB6 fill:#FF6B6B
+    style LAB7 fill:#FF6B6B
     style CLASS fill:#FF6B6B
     style REG fill:#FF6B6B
     style PG fill:#336791
@@ -2006,16 +2395,20 @@ graph TB
 This comprehensive guide covers:
 
 1. **Theoretical Foundations**: Deep dive into all 7 machine learning algorithms
-2. **Dataset Understanding**: Complete feature descriptions and target explanations
+2. **Dataset Understanding**: Complete feature descriptions and target explanations (including Wine Quality dataset)
 3. **Code Walkthrough**: Step-by-step explanation of all evaluation and prediction services
 4. **Docker Deployment**: Complete Docker setup with PostgreSQL backend
 5. **API Testing**: Detailed Postman testing guide with all endpoints
 6. **Architecture Visualization**: Mermaid diagrams for system design and data flow
+7. **MLflow Logging**: Autologging and manual logging demonstrations (Lab 6 & Lab 7)
+8. **Dataset Integration**: Kaggle API integration with automatic fallback to UCI ML Repository
 
 The MLflow Evaluation Lab provides a production-ready MLOps workflow with:
 - **Scalable Architecture**: PostgreSQL backend for large-scale experiments
 - **Reliable Deployment**: Docker Compose with health checks and dependency management
-- **Comprehensive Evaluation**: 7 different ML models covering classification, regression, clustering, and anomaly detection
+- **Comprehensive Evaluation**: 9 different ML models covering classification, regression, clustering, and anomaly detection
+- **Flexible Logging**: Both autologging and manual logging approaches demonstrated
+- **Dataset Management**: Automated dataset download with Kaggle API support
 - **RESTful API**: FastAPI-based prediction service with lazy loading and error handling
 - **Complete Documentation**: This guide serves as a reference for understanding and extending the system
 

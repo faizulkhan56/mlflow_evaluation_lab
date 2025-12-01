@@ -130,6 +130,30 @@ def map_breast_cancer_features(feature_dict: dict) -> dict:
     }
     return {mapping[k]: v for k, v in feature_dict.items() if k in mapping}
 
+def map_wine_quality_features(feature_dict: dict) -> dict:
+    """Map API feature names (underscores) to Wine Quality dataset feature names (spaces)"""
+    # Wine Quality dataset uses spaces in feature names
+    # Handle both "ph" and "pH" keys (Pydantic alias)
+    mapped = {}
+    mapping = {
+        "fixed_acidity": "fixed acidity",
+        "volatile_acidity": "volatile acidity",
+        "citric_acid": "citric acid",
+        "residual_sugar": "residual sugar",
+        "chlorides": "chlorides",
+        "free_sulfur_dioxide": "free sulfur dioxide",
+        "total_sulfur_dioxide": "total sulfur dioxide",
+        "density": "density",
+        "ph": "pH",  # Pydantic field name is "ph", but dataset uses "pH"
+        "pH": "pH",  # Also handle if someone sends "pH" directly
+        "sulphates": "sulphates",
+        "alcohol": "alcohol",
+    }
+    for k, v in feature_dict.items():
+        if k in mapping:
+            mapped[mapping[k]] = v
+    return mapped
+
 def load_model_sync(model_key: str, experiment_name: str):
     """Synchronous model loading function"""
     try:
@@ -152,6 +176,8 @@ def load_models_background_sync():
         ("lab3_kmeans_clustering", "lab3-kmeans-clustering"),
         ("lab4_random_forest", "lab4-random-forest-classifier"),
         ("lab5_isolation_forest", "lab5-isolation-forest"),
+        ("lab6_wine_quality_autolog", "lab6-wine-quality-autologging"),
+        ("lab7_wine_quality_manual", "lab7-wine-quality-manual"),
         ("xgboost_classifier", "evaluation-classification"),
         ("linear_regressor", "evaluation-regression"),
     ]
@@ -229,6 +255,22 @@ class IrisFeatures(BaseModel):
     petal_width: float = Field(..., description="Petal width in cm")
 
 # Lab 5: Isolation Forest - uses same as Lab 1 (Breast Cancer features)
+# Lab 6 & Lab 7: Wine Quality (11 features)
+class WineQualityFeatures(BaseModel):
+    fixed_acidity: float = Field(..., description="Fixed acidity (tartaric acid - g/dm³)")
+    volatile_acidity: float = Field(..., description="Volatile acidity (acetic acid - g/dm³)")
+    citric_acid: float = Field(..., description="Citric acid (g/dm³)")
+    residual_sugar: float = Field(..., description="Residual sugar (g/dm³)")
+    chlorides: float = Field(..., description="Chlorides (sodium chloride - g/dm³)")
+    free_sulfur_dioxide: float = Field(..., description="Free sulfur dioxide (mg/dm³)")
+    total_sulfur_dioxide: float = Field(..., description="Total sulfur dioxide (mg/dm³)")
+    density: float = Field(..., description="Density (g/cm³)")
+    ph: float = Field(..., alias="pH", description="pH (acidity/basicity)")
+    sulphates: float = Field(..., description="Sulphates (potassium sulphate - g/dm³)")
+    alcohol: float = Field(..., description="Alcohol content (% by volume)")
+    
+    model_config = ConfigDict(populate_by_name=True)  # Allow both "ph" and "pH" in JSON
+
 # XGBoost: Adult dataset (14 features - simplified for API)
 class AdultFeatures(BaseModel):
     age: float
@@ -461,6 +503,72 @@ async def predict_xgboost_classifier(features: dict):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")
 
+# Lab 6: Wine Quality Classification (Autologging)
+@app.post("/predict/lab6-wine-quality-autologging", response_model=PredictionResponse)
+async def predict_lab6_wine_quality_autolog(features: WineQualityFeatures):
+    """
+    Predict wine quality using Random Forest (Autologging model)
+    Returns: 0 (bad) or 1 (good)
+    """
+    # Ensure model is loaded (lazy loading)
+    ensure_model_loaded("lab6_wine_quality_autolog", "lab6-wine-quality-autologging")
+    
+    try:
+        # Convert to DataFrame with correct column names (map underscores to spaces)
+        feature_dict = features.dict()
+        mapped_features = map_wine_quality_features(feature_dict)
+        df = pd.DataFrame([mapped_features])
+        
+        # Predict
+        prediction = models_cache["lab6_wine_quality_autolog"].predict(df)[0]
+        prediction_proba = models_cache["lab6_wine_quality_autolog"].predict_proba(df)[0]
+        
+        return {
+            "prediction": int(prediction),
+            "prediction_label": "good" if prediction == 1 else "bad",
+            "prediction_probability": {
+                "bad": float(prediction_proba[0]),
+                "good": float(prediction_proba[1])
+            },
+            "model_name": "lab6-wine-quality-autologging",
+            "prediction_type": "classification"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")
+
+# Lab 7: Wine Quality Classification (Manual Logging)
+@app.post("/predict/lab7-wine-quality-manual", response_model=PredictionResponse)
+async def predict_lab7_wine_quality_manual(features: WineQualityFeatures):
+    """
+    Predict wine quality using Random Forest (Manual Logging model)
+    Returns: 0 (bad) or 1 (good)
+    """
+    # Ensure model is loaded (lazy loading)
+    ensure_model_loaded("lab7_wine_quality_manual", "lab7-wine-quality-manual")
+    
+    try:
+        # Convert to DataFrame with correct column names (map underscores to spaces)
+        feature_dict = features.dict()
+        mapped_features = map_wine_quality_features(feature_dict)
+        df = pd.DataFrame([mapped_features])
+        
+        # Predict
+        prediction = models_cache["lab7_wine_quality_manual"].predict(df)[0]
+        prediction_proba = models_cache["lab7_wine_quality_manual"].predict_proba(df)[0]
+        
+        return {
+            "prediction": int(prediction),
+            "prediction_label": "good" if prediction == 1 else "bad",
+            "prediction_probability": {
+                "bad": float(prediction_proba[0]),
+                "good": float(prediction_proba[1])
+            },
+            "model_name": "lab7-wine-quality-manual",
+            "prediction_type": "classification"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")
+
 # Linear Regressor - California Housing
 @app.post("/predict/linear-regressor", response_model=PredictionResponse)
 async def predict_linear_regressor(features: CaliforniaHousingFeatures):
@@ -500,6 +608,8 @@ async def root():
             "lab3": "/predict/lab3-kmeans-clustering",
             "lab4": "/predict/lab4-random-forest",
             "lab5": "/predict/lab5-isolation-forest",
+            "lab6": "/predict/lab6-wine-quality-autologging",
+            "lab7": "/predict/lab7-wine-quality-manual",
             "xgboost": "/predict/xgboost-classifier",
             "linear": "/predict/linear-regressor"
         },

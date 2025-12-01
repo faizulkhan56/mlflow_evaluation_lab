@@ -61,6 +61,9 @@ services:
     environment:
       - MLFLOW_TRACKING_URI=http://mlflow-server:5000
       - MLFLOW_REGISTRY_URI=http://mlflow-server:5000
+      # Kaggle API credentials for downloading datasets (from .env file)
+      - KAGGLE_USERNAME=${KAGGLE_USERNAME}
+      - KAGGLE_KEY=${KAGGLE_KEY}
     # Override command to keep container running
     # Users can exec into container to run scripts manually
     # Remove this line if you want classification.py to run automatically on startup
